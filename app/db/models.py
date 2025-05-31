@@ -65,6 +65,7 @@ class Trade(Base):
     pnl_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
     is_intraday: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
+    duration_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     user: Mapped["User"] = relationship(back_populates="trades")
 
     __table_args__ = (Index("ix_trades_symbol_entry_date", "symbol", "entry_date"),)
