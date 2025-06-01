@@ -10,6 +10,8 @@ class TradeCreate(BaseModel):
     quantity: Decimal
     direction: str
     strategy: Optional[str] = None
+    user_id: int  # 🔥 this is required!
+
 
 class TradeRead(TradeCreate):
     id: int
@@ -21,3 +23,9 @@ class TradeRead(TradeCreate):
 
     class Config:
         orm_mode = True
+
+class TradeUpdate(BaseModel):
+    exit_date: Optional[datetime] = None
+    exit_price: Optional[Decimal] = None
+    strategy: Optional[str] = None  # allow strategy change too
+

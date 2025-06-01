@@ -5,8 +5,8 @@ services:
     build: .
     container_name: trading-api
     volumes:
-      - ./app:/app/app
-      - ./trades.db:/app/trades.db
+      - .:/app # כל הפרויקט מועתק ל־/app
+      - ./data:/app/data # data צריך להיות תחת /app בתוך הקונטיינר
     ports:
       - "8000:8000"
     environment:
