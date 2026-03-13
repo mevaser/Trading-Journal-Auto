@@ -1,6 +1,31 @@
+# Python
 __pycache__/
-.env
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Virtual environments
 .venv/
+venv/
+
+# Environment variables
+.env
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Node / frontend
+node_modules/
+dist/
+build/
+
+# OS
 Desktop.ini
 desktop.ini
-trades.db
+.DS_Store
+
+# Logs
+*.log

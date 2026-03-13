@@ -1,143 +1,295 @@
-# Trading Journal – Auto‑IBKR
+# Trading Journal – Auto-IBKR
 
-> **Purpose**: Automated trading‑journal platform that fetches trades from Interactive Brokers (IBKR), stores them in a SQL database, and visualises portfolio performance against S\&P 500 (SPY) and NASDAQ 100 (QQQ).
+> **Purpose**
+> A professional trading-journal platform designed to track, analyze, and evaluate trading performance.
+> The system records trades and executions, calculates performance metrics automatically, and visualizes portfolio performance against market benchmarks such as **SPY** and **QQQ**.
 
----
-
-## 🗺 System Overview
-
-```
-IBKR API  ──►  Python Ingest Service  ──►  PostgreSQL/SQLite
-                                   │
-                                   └──►  FastAPI  ──►  Streamlit Dashboard
-                                               │
-                                yfinance (SPY, QQQ market data)
-```
-
-- **Backend**: FastAPI + SQLAlchemy 2 (async)
-- **Scheduler**: APScheduler cron job (daily import)
-- **DB**: SQLite (local) → PostgreSQL (Supabase/Render) in future
-- **Frontend**: Streamlit + Plotly
-- **Dev Experience**: Docker Compose, GitHub Actions CI, Alembic migrations, Cursor AI code‑gen
+The long-term goal is to evolve this system into a **fully automated trading analytics platform** with broker integrations and advanced portfolio insights.
 
 ---
 
-## 📂 Repository Structure _(after first scaffold)_
+# 📚 Documentation
+
+Additional project documentation:
+
+- **System architecture** → `ARCHITECTURE.md`
+- **Domain model** → `DOMAIN_MODEL.md`
+- **AI agent rules** → `AGENTS.md`
+
+These documents describe the system design, data model, and development workflow for both developers and AI coding agents.
+
+---
+
+# 🗺 System Overview
+
+Current architecture:
+
+```
+Trade Data (manual or imported)
+            │
+            ▼
+      FastAPI Backend
+            │
+   Business Logic Services
+            │
+      SQLAlchemy ORM
+            │
+        Database
+   (SQLite → PostgreSQL)
+            │
+            ▼
+     Streamlit Dashboard
+            │
+            ▼
+  Portfolio & Trade Analytics
+```
+
+Future architecture will include automated broker ingestion:
+
+```
+IBKR API
+   │
+   ▼
+Ingest Service
+   │
+   ▼
+FastAPI Backend
+   │
+Database + Analytics
+   │
+Streamlit Dashboard
+```
+
+---
+
+# ⚙ Technology Stack
+
+### Backend
+
+- **FastAPI**
+- **SQLAlchemy 2 (async)**
+- **Pydantic**
+- **Alembic migrations**
+
+### Database
+
+- **SQLite** (local development)
+- **PostgreSQL** (planned for production)
+
+### Frontend
+
+- **Streamlit**
+- **Plotly**
+
+### Market Data
+
+- **yfinance** (SPY, QQQ benchmarks)
+
+### Dev Tools
+
+- **Docker / Docker Compose**
+- **Pytest**
+- **GitHub Actions CI**
+- **AI-assisted development (Codex / Cursor)**
+
+---
+
+# 📂 Repository Structure
 
 ```
 .
-├── README.md            ← you are here
-├── app/                 ← FastAPI application package
-│   ├── api/             ← routers / endpoints
-│   ├── core/            ← config, logging, security
-│   ├── db/              ← SQLAlchemy models, CRUD, schemas
-│   └── scheduler.py     ← daily IBKR import job
-├── dashboard/           ← Streamlit app
-├── alembic/             ← DB migration scripts
-├── docker-compose.yml   ← multi‑service dev stack
-├── Dockerfile           ← backend image
-├── requirements.txt     ← Python deps
-└── .github/workflows/   ← CI pipeline
+├── README.md
+├── ARCHITECTURE.md       # System architecture explanation
+├── DOMAIN_MODEL.md       # Core domain entities
+├── AGENTS.md             # Rules for AI coding agents
+│
+├── app/                  # FastAPI backend
+│   ├── api/              # HTTP routes
+│   ├── services/         # Business logic
+│   ├── db/               # models, schemas, session
+│   └── core/             # configuration & utilities
+│
+├── streamlit_app/        # Streamlit dashboard
+├── tests/                # unit and integration tests
+├── alembic/              # database migrations
+│
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+└── .github/workflows/    # CI pipeline
 ```
 
 ---
 
-## ⚙ Prerequisites
+# 🧠 Core Design Principles
 
-- **Python ≥ 3.11** (local dev)
-- **Docker & Docker Compose** (optional but recommended)
-- Interactive Brokers **TWS** or **IB Gateway** running with API enabled
-- IBKR credentials & API port (default 7497)
+### Fills Are the Source of Truth
+
+Trades are containers for **execution events (fills)**.
+
+This allows the system to correctly handle:
+
+- partial entries
+- partial exits
+- scaling in/out
+- long and short positions
+
+All trade metrics are **calculated automatically from fills**.
 
 ---
 
-## 🚀 Quick Start (local, no Docker)
+### Server-Side Calculations
+
+Derived metrics are computed in the backend:
+
+- average entry/exit price
+- PnL (USD and %)
+- remaining quantity
+- trade duration
+- intraday classification
+
+This ensures consistency and prevents incorrect manual inputs.
+
+---
+
+### Clean Layered Architecture
+
+The backend follows a clear separation:
+
+```
+API layer
+   │
+Service layer
+   │
+Persistence layer
+   │
+Database
+```
+
+Business logic lives in **services**, not in API routes.
+
+---
+
+# 🚀 Quick Start (Local Development)
+
+Clone the repository:
 
 ```bash
-# clone & enter
-$ git clone https://github.com/<your‑org>/trading‑journal.git
-$ cd trading‑journal
+git clone https://github.com/<your-org>/trading-journal.git
+cd trading-journal
+```
 
-# create venv & install deps
-$ python -m venv .venv && source .venv/bin/activate
-$ pip install -r requirements.txt
+Create virtual environment:
 
-# set env vars (example)
-$ export IB_HOST=127.0.0.1
-$ export IB_PORT=7497
-$ export IB_CLIENT_ID=1
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
 
-# run migrations (creates SQLite by default)
-$ alembic upgrade head
+Install dependencies:
 
-# start FastAPI dev server
-$ uvicorn app.main:app --reload
+```bash
+pip install -r requirements.txt
+```
 
-# launch Streamlit dashboard (in separate shell)
-$ streamlit run dashboard/main.py
+Run database migrations:
+
+```bash
+alembic upgrade head
+```
+
+Start backend server:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Open API docs:
+
+```
+http://localhost:8000/docs
+```
+
+Start the Streamlit dashboard:
+
+```bash
+streamlit run streamlit_app/app.py
 ```
 
 ---
 
-## 🐳 Quick Start with Docker
+# 🐳 Docker Development
+
+Run the full stack:
 
 ```bash
-# build images & start services
-$ docker compose up --build
+docker compose up --build
 ```
 
 Services:
 
-- **backend**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **dashboard**: [http://localhost:8501](http://localhost:8501)
-- **db**: persists in `./postgres-data` volume
+- Backend → http://localhost:8000/docs
+- Dashboard → http://localhost:8501
 
 ---
 
-## 🛠 Development Workflow
+# 🧪 Testing
 
-1. **Generate code with Cursor**
-
-   - Ask Cursor to _"create SQLAlchemy models based on this ERD"_.
-   - Prompt: _"docker‑compose with FastAPI(uvicorn) + Postgres 15"_.
-
-2. **Commit early, commit often** (`dev` branch).
-3. **Migrations**: `alembic revision --autogenerate -m "init"` → `alembic upgrade head`.
-4. **Write/adjust tests** (`pytest`).
-5. **Push → GitHub Actions** runs lint + tests + image build.
-6. **Merge to `main` when green** – auto‑deploy optional (Render/Supabase).
-
----
-
-## 🧪 Testing
+Run the test suite:
 
 ```bash
 pytest -q
 ```
 
-Includes unit tests for CRUD & API, plus integration test for IBKR ingest (mocked).
+Tests include:
+
+- API contract validation
+- trade calculation logic
+- fill lifecycle
+- database migrations
 
 ---
 
-## 🔒 Security Notes
+# 📊 Current Features
 
-- Secrets are **NOT** committed – use `.env`, GitHub Secrets, or Render env panel.
-- Passwords stored with Argon2.
-- API traffic served over HTTPS in production.
-
----
-
-## ✨ Roadmap
-
-- [ ] Multi‑user auth & role‑based access
-- [ ] Advanced analytics (expectancy, Sharpe, drawdowns)
-- [ ] Telegram/Email daily summary
-- [ ] Deployment template for Supabase + Render
+- Trade lifecycle management
+- Fill-based accounting
+- Automatic PnL calculation
+- Filtering and querying trades
+- Basic analytics dashboard
+- Migration-based database evolution
 
 ---
 
-## 🤝 Contributing
+# 🔮 Roadmap
 
-PRs welcome. Please adhere to PEP8, run `ruff --fix`, and add tests.
+Planned improvements:
+
+- Interactive Brokers (IBKR) trade import
+- multi-user authentication
+- portfolio performance analytics
+- benchmark comparison (SPY / QQQ)
+- strategy analysis and expectancy metrics
+- drawdown and risk analytics
+- automated reporting (Telegram / email)
 
 ---
+
+# 🔒 Security
+
+- Secrets are not committed to the repository.
+- Environment variables are managed via `.env`.
+- Passwords stored with **Argon2**.
+
+---
+
+# 🤝 Contributing
+
+Contributions are welcome.
+
+Before submitting a PR:
+
+- follow **PEP8**
+- run tests
+- keep changes incremental
+- maintain separation between API and business logic

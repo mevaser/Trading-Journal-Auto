@@ -1,18 +1,22 @@
 from fastapi import FastAPI
-from app.api import trades
-from app.db.session import engine
-from app.db.models import Base
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.api import fills, trades
 
-app = FastAPI()
+app = FastAPI(title="Trading Journal API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:8501"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(trades.router)
+app.include_router(fills.router)
 
-@app.on_event("startup")
-async def startup_event():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
 
 @app.get("/")
-def root():
+def root() -> dict[str, str]:
     return {"message": "Trading Journal API is live"}

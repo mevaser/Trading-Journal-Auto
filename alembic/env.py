@@ -1,9 +1,4 @@
-"""Alembic environment – async engine (SQLite / Postgres).
-
-• משתמש ב‑async_engine_from_config
-• טוען את Base.metadata מתוך app.db.models
-• תומך ב‑autogenerate ו‑SQLite batch
-"""
+"""Alembic environment - async engine (SQLite / Postgres)."""
 from __future__ import annotations
 
 import asyncio
@@ -14,24 +9,27 @@ from typing import Any
 
 from alembic import context
 from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import async_engine_from_config, AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, async_engine_from_config
 
-# ── 1. Alembic Config ─────────────────────────────────────────────
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# ── 2. Load project models so target_metadata is populated ────────
 import importlib
 import sys
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))  # allows `import app.*`
+
+from app.core.config import get_database_url
+
+# Canonical DB URL for both runtime and migrations.
+config.set_main_option("sqlalchemy.url", get_database_url())
 
 models: ModuleType = importlib.import_module("app.db.models")  # noqa: F401
 target_metadata = models.Base.metadata  # type: ignore[attr-defined]
 
 
-# ── 3. Offline / Online helpers ──────────────────────────────────
 def run_migrations_offline() -> None:
     """Generate SQL scripts without DB connection."""
     url = config.get_main_option("sqlalchemy.url")
@@ -41,7 +39,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
-        render_as_batch=True,  # needed for SQLite ALTERs
+        render_as_batch=True,
     )
 
     with context.begin_transaction():
@@ -72,7 +70,6 @@ async def run_migrations_online() -> None:
     await connectable.dispose()
 
 
-# ── 4. Entrypoint ────────────────────────────────────────────────
 if context.is_offline_mode():
     run_migrations_offline()
 else:

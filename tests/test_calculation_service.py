@@ -1,0 +1,86 @@
+from datetime import datetime, timezone
+from decimal import Decimal
+
+import pytest
+
+from app.db.models import Trade, TradeFill
+from app.services.calculation_service import calculate_trade_metrics
+
+
+UTC = timezone.utc
+
+
+def _fill(side: str, qty: str, price: str, ts: datetime, commission: str = "0") -> TradeFill:
+    return TradeFill(
+        trade_id=1,
+        side=side,
+        quantity=Decimal(qty),
+        price=Decimal(price),
+        fill_datetime=ts,
+        commission=Decimal(commission),
+        source="manual",
+    )
+
+
+def test_calculate_metrics_long_closed_intraday() -> None:
+    trade = Trade(user_id=1, symbol="AAPL", direction="LONG")
+    fills = [
+        _fill("BUY", "10", "100", datetime(2026, 1, 10, 10, 0, tzinfo=UTC)),
+        _fill("BUY", "10", "110", datetime(2026, 1, 10, 11, 0, tzinfo=UTC)),
+        _fill("SELL", "20", "120", datetime(2026, 1, 10, 15, 0, tzinfo=UTC), commission="2"),
+    ]
+
+    metrics = calculate_trade_metrics(trade, fills)
+
+    assert metrics.avg_entry_price == Decimal("105")
+    assert metrics.avg_exit_price == Decimal("120")
+    assert metrics.quantity_opened == Decimal("20")
+    assert metrics.quantity_closed == Decimal("20")
+    assert metrics.remaining_quantity == Decimal("0")
+    assert metrics.status == "closed"
+    assert metrics.pnl_usd == Decimal("298")
+    assert metrics.is_intraday is True
+    assert metrics.duration_days == 0
+
+
+def test_calculate_metrics_long_partial_close() -> None:
+    trade = Trade(user_id=1, symbol="MSFT", direction="LONG")
+    fills = [
+        _fill("BUY", "10", "100", datetime(2026, 1, 11, 10, 0, tzinfo=UTC)),
+        _fill("SELL", "4", "110", datetime(2026, 1, 12, 10, 0, tzinfo=UTC), commission="1"),
+    ]
+
+    metrics = calculate_trade_metrics(trade, fills)
+
+    assert metrics.status == "partial"
+    assert metrics.quantity_opened == Decimal("10")
+    assert metrics.quantity_closed == Decimal("4")
+    assert metrics.remaining_quantity == Decimal("6")
+    assert metrics.pnl_usd == Decimal("39")
+    assert metrics.is_intraday is None
+    assert metrics.duration_days is None
+
+
+def test_calculate_metrics_short_closed() -> None:
+    trade = Trade(user_id=1, symbol="TSLA", direction="SHORT")
+    fills = [
+        _fill("SELL", "5", "50", datetime(2026, 2, 1, 10, 0, tzinfo=UTC)),
+        _fill("BUY", "5", "40", datetime(2026, 2, 3, 10, 0, tzinfo=UTC)),
+    ]
+
+    metrics = calculate_trade_metrics(trade, fills)
+
+    assert metrics.status == "closed"
+    assert metrics.pnl_usd == Decimal("50")
+    assert metrics.duration_days == 2
+
+
+def test_calculate_metrics_invalid_close_qty() -> None:
+    trade = Trade(user_id=1, symbol="NVDA", direction="LONG")
+    fills = [
+        _fill("BUY", "2", "100", datetime(2026, 2, 4, 10, 0, tzinfo=UTC)),
+        _fill("SELL", "3", "101", datetime(2026, 2, 5, 10, 0, tzinfo=UTC)),
+    ]
+
+    with pytest.raises(ValueError, match="closing quantity cannot exceed opened quantity"):
+        calculate_trade_metrics(trade, fills)
