@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 
-from app.brokers.ibkr.dto import ExecutionDTO
+from app.brokers.ibkr.dto import AssetType, ExecutionDTO
 
 
 @dataclass(slots=True)
@@ -18,6 +19,25 @@ class ImportSummary:
     errors: list[str] = field(default_factory=list)
 
 
+class TradeResolutionAction(StrEnum):
+    """Trade resolution outcome for an execution."""
+
+    CREATED = "created"
+    UPDATED = "updated"
+    UNCHANGED = "unchanged"
+
+
+@dataclass(slots=True)
+class TradeResolutionResult:
+    """Resolved trade context required for downstream fill insertion."""
+
+    action: TradeResolutionAction
+    trade_id: int | None
+    symbol: str
+    asset_type: AssetType
+    user_id: int | None = None
+
+
 class TradeImportService:
     """Imports normalized broker executions into the journal domain."""
 
@@ -31,18 +51,18 @@ class TradeImportService:
                     summary.duplicates_skipped += 1
                     continue
 
-                trade_action = await self._resolve_trade_for_execution(execution)
-                if trade_action == "created":
+                resolution = await self._resolve_trade_for_execution(execution)
+                if resolution.action == TradeResolutionAction.CREATED:
                     summary.trades_created += 1
-                elif trade_action == "updated":
+                elif resolution.action == TradeResolutionAction.UPDATED:
                     summary.trades_updated += 1
 
-                await self._insert_fill_from_execution(execution)
+                await self._insert_fill_from_execution(execution, resolution)
                 summary.imported += 1
             except Exception as exc:  # noqa: BLE001 - keep skeleton resilient for batch import.
                 summary.failed += 1
                 summary.errors.append(
-                    f"execution_id={execution.external_execution_id}: {exc}"
+                    f"external_execution_id={execution.external_execution_id}: {exc}"
                 )
 
         return summary
@@ -52,11 +72,20 @@ class TradeImportService:
         _ = execution
         return False
 
-    async def _resolve_trade_for_execution(self, execution: ExecutionDTO) -> str:
+    async def _resolve_trade_for_execution(
+        self, execution: ExecutionDTO
+    ) -> TradeResolutionResult:
         """Placeholder for future trade matching/creation strategy."""
-        _ = execution
-        return "unchanged"
+        return TradeResolutionResult(
+            action=TradeResolutionAction.UNCHANGED,
+            trade_id=None,
+            symbol=execution.symbol,
+            asset_type=execution.asset_type,
+            user_id=None,
+        )
 
-    async def _insert_fill_from_execution(self, execution: ExecutionDTO) -> None:
+    async def _insert_fill_from_execution(
+        self, execution: ExecutionDTO, resolution: TradeResolutionResult
+    ) -> None:
         """Placeholder for future fill insertion into persistence layer."""
-        _ = execution
+        _ = execution, resolution
