@@ -7,19 +7,29 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from sqlalchemy.engine import make_url
 
-from app.core.config import get_database_url
+from app.core.config import clear_settings_cache, get_database_url
+
+
+@pytest.fixture(autouse=True)
+def _reset_settings_cache() -> None:
+    clear_settings_cache()
+    yield
+    clear_settings_cache()
 
 
 def test_runtime_and_alembic_use_same_database_url(tmp_path: Path, monkeypatch) -> None:
     db_path = (tmp_path / "shared_phase1.db").resolve()
     database_url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
     monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("APP_SECRET_KEY", "test-secret")
 
     repo_root = Path(__file__).resolve().parents[1]
     env = os.environ.copy()
     env["DATABASE_URL"] = database_url
+    env["APP_SECRET_KEY"] = "test-secret"
 
     subprocess.run(
         [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],

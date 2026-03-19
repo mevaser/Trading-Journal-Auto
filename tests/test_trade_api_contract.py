@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -6,7 +6,9 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.db.models import Base, User
+from app.auth.tokens import issue_token_pair
+from app.core.config import clear_settings_cache
+from app.db.models import Base, Membership, Tenant, User
 from app.db.session import get_db
 from app.main import app
 
@@ -58,7 +60,10 @@ def anyio_backend() -> str:
 
 
 @pytest.fixture()
-async def api_client(tmp_path: Path):
+async def api_client(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("APP_SECRET_KEY", "test-secret")
+    clear_settings_cache()
+
     db_file = tmp_path / "test_phase1_contract.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_file}")
     test_session_local = async_sessionmaker(engine, expire_on_commit=False)
@@ -67,8 +72,20 @@ async def api_client(tmp_path: Path):
         await conn.run_sync(Base.metadata.create_all)
 
     async with test_session_local() as session:
-        session.add(User(username="phase1", email="phase1@example.com", password_hash="x"))
+        tenant = Tenant(id=1, slug="default", name="Default", is_active=True)
+        user = User(username="phase1", email="phase1@example.com", password_hash="x")
+        session.add_all([tenant, user])
+        await session.flush()
+        session.add(Membership(tenant_id=tenant.id, user_id=user.id, role="owner", is_active=True))
         await session.commit()
+
+    token_pair = issue_token_pair(
+        user_id=1,
+        tenant_id=1,
+        roles=["owner"],
+        secret_key="test-secret",
+    )
+    auth_headers = {"Authorization": f"Bearer {token_pair.access_token}", "X-Tenant-ID": "1"}
 
     async def override_get_db():
         async with test_session_local() as session:
@@ -78,14 +95,17 @@ async def api_client(tmp_path: Path):
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
+        yield client, auth_headers
 
     app.dependency_overrides.clear()
+    clear_settings_cache()
     await engine.dispose()
 
 
 @pytest.mark.anyio
-async def test_trade_contract_in_list_and_detail(api_client: AsyncClient) -> None:
+async def test_trade_contract_in_list_and_detail(api_client) -> None:
+    client, headers = api_client
+
     create_payload = {
         "symbol": "AAPL",
         "direction": "LONG",
@@ -97,7 +117,7 @@ async def test_trade_contract_in_list_and_detail(api_client: AsyncClient) -> Non
         "tags": "tech,momentum",
         "user_id": 1,
     }
-    create_resp = await api_client.post("/trades/", json=create_payload)
+    create_resp = await client.post("/trades/", json=create_payload, headers=headers)
     assert create_resp.status_code == 201
     trade = create_resp.json()
     trade_id = trade["id"]
@@ -112,10 +132,10 @@ async def test_trade_contract_in_list_and_detail(api_client: AsyncClient) -> Non
         "commission": "1",
         "source": "manual",
     }
-    fill_resp = await api_client.post(f"/trades/{trade_id}/fills", json=fill_payload)
+    fill_resp = await client.post(f"/trades/{trade_id}/fills", json=fill_payload, headers=headers)
     assert fill_resp.status_code == 201
 
-    list_resp = await api_client.get("/trades/")
+    list_resp = await client.get("/trades/", headers=headers)
     assert list_resp.status_code == 200
     trades = list_resp.json()
     assert len(trades) == 1
@@ -123,7 +143,7 @@ async def test_trade_contract_in_list_and_detail(api_client: AsyncClient) -> Non
     assert isinstance(trades[0]["fills"], list)
     assert len(trades[0]["fills"]) == 1
 
-    detail_resp = await api_client.get(f"/trades/{trade_id}")
+    detail_resp = await client.get(f"/trades/{trade_id}", headers=headers)
     assert detail_resp.status_code == 200
     detail_trade = detail_resp.json()
     assert set(detail_trade.keys()) == CANONICAL_TRADE_KEYS
@@ -131,17 +151,20 @@ async def test_trade_contract_in_list_and_detail(api_client: AsyncClient) -> Non
 
 
 @pytest.mark.anyio
-async def test_legacy_fields_not_in_canonical_response(api_client: AsyncClient) -> None:
-    create_resp = await api_client.post(
+async def test_legacy_fields_not_in_canonical_response(api_client) -> None:
+    client, headers = api_client
+
+    create_resp = await client.post(
         "/trades/",
         json={"symbol": "MSFT", "direction": "LONG", "user_id": 1},
+        headers=headers,
     )
     assert create_resp.status_code == 201
     trade = create_resp.json()
 
     assert LEGACY_KEYS.isdisjoint(set(trade.keys()))
 
-    detail_resp = await api_client.get(f"/trades/{trade['id']}")
+    detail_resp = await client.get(f"/trades/{trade['id']}", headers=headers)
     assert detail_resp.status_code == 200
     detail_trade = detail_resp.json()
     assert LEGACY_KEYS.isdisjoint(set(detail_trade.keys()))
