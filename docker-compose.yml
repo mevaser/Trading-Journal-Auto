@@ -1,14 +1,104 @@
-version: "3.9"
-
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: trading-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-trading_journal}
+      POSTGRES_USER: ${POSTGRES_USER:-trading}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-trading} -d ${POSTGRES_DB:-trading_journal}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: trading-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   api:
     build: .
     container_name: trading-api
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://trading:trading@db:5432/trading_journal}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
-      - .:/app # כל הפרויקט מועתק ל־/app
-      - ./data:/app/data # data צריך להיות תחת /app בתוך הקונטיינר
+      - .:/app
     ports:
       - "8000:8000"
-    environment:
-      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: trading-worker
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://trading:trading@db:5432/trading_journal}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    command: >
+      celery -A app.worker.celery_app:celery_app worker --loglevel=info --pool=solo
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  streamlit:
+    build: .
+    container_name: trading-streamlit
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://api:8000}
+    command: >
+      streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0
+    volumes:
+      - .:/app
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
