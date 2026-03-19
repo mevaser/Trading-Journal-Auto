@@ -11,6 +11,11 @@ venv/
 
 # Environment variables
 .env
+.env.*
+!.env.example
+!.env.dev.example
+!.env.stage.example
+!.env.prod.example
 
 # Databases
 *.db

@@ -293,3 +293,50 @@ Before submitting a PR:
 - run tests
 - keep changes incremental
 - maintain separation between API and business logic
+
+## Local Platform Bootstrap (W0-T5)
+
+This repository ships with a 5-service local platform via Docker Compose:
+
+- `api` (FastAPI + Alembic migrations on startup)
+- `db` (PostgreSQL 16)
+- `redis` (Redis 7)
+- `worker` (Celery worker)
+- `streamlit` (dashboard)
+
+### Start
+
+```bash
+docker compose --env-file .env.example up --build
+```
+
+### URLs
+
+- API docs: `http://localhost:8000/docs`
+- Streamlit: `http://localhost:8501`
+- Postgres: `localhost:5432`
+- Redis: `localhost:6379`
+
+### Notes
+
+- For local overrides, copy `.env.example` to `.env` and edit values.
+- API and worker share `DATABASE_URL` and `REDIS_URL`.
+- Streamlit uses `API_BASE_URL` (defaults to `http://api:8000` in Docker network).
+
+---
+
+## Environment Profiles (`dev/stage/prod`)
+
+Configuration is profile-aware via `APP_ENV` with deterministic precedence:
+
+1. Built-in profile defaults
+2. `.env`
+3. `.env.<profile>`
+4. `.env.local`
+5. `.env.<profile>.local`
+6. Process environment variables
+
+Notes:
+- Use `.env.dev`, `.env.stage`, `.env.prod` for checked-out local profile settings.
+- Keep secrets in `.env.local` / `.env.<profile>.local` or real environment variables.
+- `APP_SECRET_KEY` is required for `stage` and `prod`; `dev` has a local-only fallback.
