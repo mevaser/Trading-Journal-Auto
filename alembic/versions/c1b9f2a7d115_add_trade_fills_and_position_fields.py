@@ -72,6 +72,16 @@ def downgrade() -> None:
     op.drop_index("ix_trade_fills_trade_id", table_name="trade_fills")
     op.drop_table("trade_fills")
 
+    # Preserve downgrade safety for rows created while these fields were nullable.
+    op.execute(
+        sa.text(
+            "UPDATE trades "
+            "SET entry_date = COALESCE(entry_date, opened_at, created_at, CURRENT_TIMESTAMP), "
+            "entry_price = COALESCE(entry_price, 0), "
+            "quantity = COALESCE(quantity, 0)"
+        )
+    )
+
     with op.batch_alter_table("trades", schema=None) as batch_op:
         batch_op.drop_index("ix_trades_status")
         batch_op.drop_column("updated_at")

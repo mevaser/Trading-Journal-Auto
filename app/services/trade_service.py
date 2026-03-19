@@ -2,42 +2,49 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.models import Trade, TradeFill
+from app.observability import ResourceNotFoundError
 from app.services.calculation_service import calculate_trade_metrics
 
 
-async def get_trade_or_404(db: AsyncSession, trade_id: int) -> Trade:
+async def get_trade_or_404(db: AsyncSession, trade_id: int, *, tenant_id: int | None = None) -> Trade:
     stmt = select(Trade).options(selectinload(Trade.fills)).where(Trade.id == trade_id)
+    if tenant_id is not None:
+        stmt = stmt.where(Trade.tenant_id == tenant_id)
     trade = (await db.execute(stmt)).scalar_one_or_none()
     if trade is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trade not found")
+        raise ResourceNotFoundError("Trade not found", details={"trade_id": trade_id})
     return trade
 
 
-async def get_fill_or_404(db: AsyncSession, fill_id: int) -> TradeFill:
-    fill = await db.get(TradeFill, fill_id)
+async def get_fill_or_404(db: AsyncSession, fill_id: int, *, tenant_id: int | None = None) -> TradeFill:
+    stmt = select(TradeFill).where(TradeFill.id == fill_id)
+    if tenant_id is not None:
+        stmt = stmt.where(TradeFill.tenant_id == tenant_id)
+    fill = (await db.execute(stmt)).scalar_one_or_none()
     if fill is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fill not found")
+        raise ResourceNotFoundError("Fill not found", details={"fill_id": fill_id})
     return fill
 
 
-async def list_trade_fills(db: AsyncSession, trade_id: int) -> list[TradeFill]:
+async def list_trade_fills(db: AsyncSession, trade_id: int, *, tenant_id: int | None = None) -> list[TradeFill]:
     stmt = (
         select(TradeFill)
         .where(TradeFill.trade_id == trade_id)
         .order_by(TradeFill.fill_datetime.asc(), TradeFill.id.asc())
     )
+    if tenant_id is not None:
+        stmt = stmt.where(TradeFill.tenant_id == tenant_id)
     result = await db.execute(stmt)
     return list(result.scalars().all())
 
 
 async def recalculate_trade(db: AsyncSession, trade: Trade) -> None:
-    fills = await list_trade_fills(db, trade.id)
+    fills = await list_trade_fills(db, trade.id, tenant_id=trade.tenant_id)
     metrics = calculate_trade_metrics(trade, fills)
 
     trade.opened_at = metrics.opened_at
@@ -63,13 +70,14 @@ async def recalculate_trade(db: AsyncSession, trade: Trade) -> None:
 
 async def list_trades(
     db: AsyncSession,
+    tenant_id: int,
     symbol: Optional[str] = None,
     strategy: Optional[str] = None,
     status: Optional[str] = None,
     direction: Optional[str] = None,
     is_intraday: Optional[bool] = None,
 ) -> list[Trade]:
-    stmt = select(Trade).options(selectinload(Trade.fills))
+    stmt = select(Trade).options(selectinload(Trade.fills)).where(Trade.tenant_id == tenant_id)
 
     if symbol:
         stmt = stmt.where(Trade.symbol == symbol)

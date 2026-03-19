@@ -41,10 +41,12 @@ def calculate_trade_metrics(trade: Trade, fills: Iterable[TradeFill]) -> TradeMe
     opening_side = "BUY" if direction == "LONG" else "SELL"
     closing_side = "SELL" if direction == "LONG" else "BUY"
 
-    ordered_fills = sorted(fills, key=lambda item: item.fill_datetime)
+    ordered_fills = sorted(fills, key=lambda item: (item.fill_datetime, item.id or 0))
 
     open_qty = ZERO
     close_qty = ZERO
+    remaining = ZERO
+    seen_full_close = False
     open_notional = ZERO
     close_notional = ZERO
     total_commission = ZERO
@@ -63,21 +65,24 @@ def calculate_trade_metrics(trade: Trade, fills: Iterable[TradeFill]) -> TradeMe
 
         total_commission += commission
         if side == opening_side:
+            if seen_full_close:
+                raise ValueError("reopening a fully closed trade is not supported")
             open_qty += qty
             open_notional += qty * price
+            remaining += qty
             opening_timestamps.append(fill.fill_datetime)
         elif side == closing_side:
+            if qty > remaining:
+                raise ValueError("closing quantity exceeds currently open quantity at fill time")
             close_qty += qty
             close_notional += qty * price
+            remaining -= qty
+            if remaining == ZERO and open_qty > ZERO:
+                seen_full_close = True
             closing_timestamps.append(fill.fill_datetime)
-
-    if close_qty > open_qty:
-        raise ValueError("closing quantity cannot exceed opened quantity")
 
     avg_entry = _weighted_avg(open_notional, open_qty)
     avg_exit = _weighted_avg(close_notional, close_qty)
-
-    remaining = open_qty - close_qty
 
     if open_qty == ZERO:
         status = "open"

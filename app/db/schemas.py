@@ -33,6 +33,27 @@ class FillBase(BaseModel):
     def normalize_source(cls, value: str) -> str:
         return value.strip().lower()
 
+    @field_validator("quantity")
+    @classmethod
+    def validate_quantity_positive(cls, value: Decimal) -> Decimal:
+        if value <= 0:
+            raise ValueError("quantity must be greater than 0")
+        return value
+
+    @field_validator("price")
+    @classmethod
+    def validate_price_positive(cls, value: Decimal) -> Decimal:
+        if value <= 0:
+            raise ValueError("price must be greater than 0")
+        return value
+
+    @field_validator("commission")
+    @classmethod
+    def validate_commission_non_negative(cls, value: Decimal) -> Decimal:
+        if value < 0:
+            raise ValueError("commission must be greater than or equal to 0")
+        return value
+
 
 class FillCreate(FillBase):
     pass
@@ -53,6 +74,33 @@ class FillUpdate(BaseModel):
         if value is None:
             return None
         return normalize_datetime_to_utc(value)
+
+    @field_validator("quantity")
+    @classmethod
+    def validate_quantity_positive(cls, value: Decimal | None) -> Decimal | None:
+        if value is None:
+            return None
+        if value <= 0:
+            raise ValueError("quantity must be greater than 0")
+        return value
+
+    @field_validator("price")
+    @classmethod
+    def validate_price_positive(cls, value: Decimal | None) -> Decimal | None:
+        if value is None:
+            return None
+        if value <= 0:
+            raise ValueError("price must be greater than 0")
+        return value
+
+    @field_validator("commission")
+    @classmethod
+    def validate_commission_non_negative(cls, value: Decimal | None) -> Decimal | None:
+        if value is None:
+            return None
+        if value < 0:
+            raise ValueError("commission must be greater than or equal to 0")
+        return value
 
 
 class FillRead(FillBase):
