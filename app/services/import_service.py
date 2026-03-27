@@ -25,6 +25,10 @@ class ImportSummary:
     failed: int = 0
     trades_created: int = 0
     trades_updated: int = 0
+    projected_trades_created: int = 0
+    projected_trades_updated: int = 0
+    projected_fills_created: int = 0
+    projection_failures: int = 0
     errors: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
@@ -36,6 +40,10 @@ class ImportSummary:
                 "failed": self.failed,
                 "trades_created": self.trades_created,
                 "trades_updated": self.trades_updated,
+                "projected_trades_created": self.projected_trades_created,
+                "projected_trades_updated": self.projected_trades_updated,
+                "projected_fills_created": self.projected_fills_created,
+                "projection_failures": self.projection_failures,
                 "errors": self.errors,
             }
         )
@@ -111,7 +119,7 @@ class TradeImportService:
                         session=self.db,
                         tenant_id=self.tenant_id,
                     )
-                    await projection.apply_resolution(
+                    projection_result = await projection.apply_resolution(
                         session=self.db,
                         execution=execution,
                         resolution=resolution,
@@ -119,7 +127,14 @@ class TradeImportService:
                         user_id=self.user_id if self.user_id is not None else 1,
                         canonical_execution_fill_id=record.canonical_execution_fill_id,
                     )
+                    if resolution.action.value == "created":
+                        summary.projected_trades_created += 1
+                    elif resolution.action.value == "updated":
+                        summary.projected_trades_updated += 1
+                    if projection_result.fill_created:
+                        summary.projected_fills_created += 1
                 except Exception as exc:  # noqa: BLE001 - row-level projection failures must not stop import
+                    summary.projection_failures += 1
                     projection_logger.warning(
                         "projection_failed",
                         extra={

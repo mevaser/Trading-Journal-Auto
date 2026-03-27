@@ -379,6 +379,11 @@ async def test_stage1_import_projects_trade_and_trade_fill_for_resolved_inserted
 
     response = await client.post("/broker/ibkr/import", json=payload, headers=headers_1)
     assert response.status_code == 200
+    summary = response.json()["summary"]
+    assert summary["projected_trades_created"] == 1
+    assert summary["projected_trades_updated"] == 0
+    assert summary["projected_fills_created"] == 1
+    assert summary["projection_failures"] == 0
 
     async with session_local() as session:
         after_trades = await _count_rows(session, Trade)
@@ -546,6 +551,11 @@ async def test_stage1_import_projects_into_existing_open_trade_for_updated_path(
 
     response = await client.post("/broker/ibkr/import", json=payload, headers=headers_1)
     assert response.status_code == 200
+    summary = response.json()["summary"]
+    assert summary["projected_trades_created"] == 0
+    assert summary["projected_trades_updated"] == 1
+    assert summary["projected_fills_created"] == 1
+    assert summary["projection_failures"] == 0
 
     async with session_local() as session:
         trade_count = await _count_rows(session, Trade)
@@ -882,7 +892,7 @@ async def test_stage1_projection_failure_is_row_level_and_import_continues(api_c
     async def failing_apply_resolution(self, session, execution, resolution, tenant_id, user_id, canonical_execution_fill_id=None):
         if execution.external_execution_id == "exec-live-projection-fail":
             raise RuntimeError("forced projection failure for test")
-        await original_apply_resolution(
+        return await original_apply_resolution(
             self,
             session,
             execution,
@@ -937,6 +947,10 @@ async def test_stage1_projection_failure_is_row_level_and_import_continues(api_c
     assert body["status"] == "completed"
     assert body["summary"]["imported"] == 3
     assert body["summary"]["failed"] == 0
+    assert body["summary"]["projected_trades_created"] == 2
+    assert body["summary"]["projected_trades_updated"] == 0
+    assert body["summary"]["projected_fills_created"] == 2
+    assert body["summary"]["projection_failures"] == 1
 
     async with session_local() as session:
         trade_count = await _count_rows(session, Trade)

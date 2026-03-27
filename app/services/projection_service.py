@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -10,6 +11,11 @@ from app.db.models import Trade, TradeFill
 from app.observability import DomainValidationError, ResourceNotFoundError
 from app.services.import_models import TradeResolutionAction, TradeResolutionResult
 from app.services.trade_service import recalculate_trade
+
+
+@dataclass(frozen=True)
+class ProjectionApplyResult:
+    fill_created: bool
 
 
 class ProjectionService:
@@ -105,7 +111,7 @@ class ProjectionService:
         tenant_id: int,
         user_id: int,
         canonical_execution_fill_id: int | None = None,
-    ):
+    ) -> ProjectionApplyResult:
         if resolution.action == TradeResolutionAction.CREATED:
             trade = await self._create_trade_from_execution(
                 session=session,
@@ -122,6 +128,7 @@ class ProjectionService:
             )
             if fill_created:
                 await recalculate_trade(session, trade)
+            return ProjectionApplyResult(fill_created=fill_created)
 
         if resolution.action == TradeResolutionAction.UPDATED:
             if resolution.trade_id is None:
@@ -150,3 +157,6 @@ class ProjectionService:
             )
             if fill_created:
                 await recalculate_trade(session, trade)
+            return ProjectionApplyResult(fill_created=fill_created)
+
+        return ProjectionApplyResult(fill_created=False)

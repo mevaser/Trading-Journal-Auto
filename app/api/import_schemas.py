@@ -66,6 +66,10 @@ class ImportSummaryResponse(BaseModel):
     failed: int
     trades_created: int
     trades_updated: int
+    projected_trades_created: int
+    projected_trades_updated: int
+    projected_fills_created: int
+    projection_failures: int
     errors: list[str]
 
 

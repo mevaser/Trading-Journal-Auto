@@ -208,6 +208,10 @@ async def trigger_ibkr_import(
             failed=summary.failed,
             trades_created=summary.trades_created,
             trades_updated=summary.trades_updated,
+            projected_trades_created=summary.projected_trades_created,
+            projected_trades_updated=summary.projected_trades_updated,
+            projected_fills_created=summary.projected_fills_created,
+            projection_failures=summary.projection_failures,
             errors=list(summary.errors),
         ),
     )
