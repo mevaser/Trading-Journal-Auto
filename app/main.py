@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, fills, trades
+from app.api import auth, broker, fills, imports, jobs, trades
 from app.observability import (
     AppError,
     ErrorCode,
@@ -160,6 +160,9 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(trades.router)
 app.include_router(fills.router)
+app.include_router(broker.router)
+app.include_router(imports.router)
+app.include_router(jobs.router)
 
 
 @app.get("/")

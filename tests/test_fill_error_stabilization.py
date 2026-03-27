@@ -150,7 +150,7 @@ async def test_duplicate_external_fill_id_maps_to_domain_validation(api_client) 
     assert duplicate.status_code == 400
     payload = duplicate.json()
     assert payload["error"]["code"] == "domain_validation"
-    assert payload["error"]["message"] == "external_fill_id already exists for this tenant"
+    assert payload["error"]["message"] == "external_fill_id already exists for this tenant and source"
     _assert_request_id(payload, "req-fill-duplicate")
 
 

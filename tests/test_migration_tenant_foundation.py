@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tests.utils.alembic_helpers import get_head_revision
+
 
 def _run_alembic(repo_root: Path, env: dict[str, str], *args: str) -> None:
     subprocess.run(
@@ -42,7 +44,7 @@ def test_tenant_foundation_upgrade_has_expected_schema(tmp_path: Path, monkeypat
         for row in conn.execute("PRAGMA index_list(trade_fills)"):
             if row[1] == "sqlite_autoindex_trade_fills_1" or row[2] == 1:
                 cols = [c[2] for c in conn.execute(f"PRAGMA index_info({row[1]!r})")]
-                if cols == ["tenant_id", "external_fill_id"]:
+                if cols == ["tenant_id", "source", "external_fill_id"]:
                     unique_index_name = row[1]
                     break
 
@@ -56,7 +58,7 @@ def test_tenant_foundation_upgrade_has_expected_schema(tmp_path: Path, monkeypat
     assert "ix_trade_fills_tenant_trade_fill_datetime" in fill_indexes
     assert unique_index_name is not None
     assert default_tenant == (1, "default")
-    assert revision == "d3c1a9f4e6b2"
+    assert revision == get_head_revision()
 
 
 def test_tenant_foundation_downgrade_handles_cross_tenant_external_fill_id_duplicates(
@@ -128,4 +130,4 @@ def test_tenant_foundation_downgrade_handles_cross_tenant_external_fill_id_dupli
     with sqlite3.connect(db_path) as conn:
         revision = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
 
-    assert revision == "d3c1a9f4e6b2"
+    assert revision == get_head_revision()

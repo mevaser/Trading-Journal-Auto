@@ -340,3 +340,33 @@ Notes:
 - Use `.env.dev`, `.env.stage`, `.env.prod` for checked-out local profile settings.
 - Keep secrets in `.env.local` / `.env.<profile>.local` or real environment variables.
 - `APP_SECRET_KEY` is required for `stage` and `prod`; `dev` has a local-only fallback.
+
+---
+
+## Development Workflow
+
+Step-by-step usage:
+
+1. Start environment:
+   `powershell -ExecutionPolicy Bypass -File .\scripts\dev_up.ps1`
+
+2. Run tests:
+   `powershell -ExecutionPolicy Bypass -File .\scripts\test_stage1_stage2.ps1`
+
+3. Run smoke test:
+   `powershell -ExecutionPolicy Bypass -File .\scripts\smoke_import_and_rebuild.ps1`
+
+4. Stop environment:
+   `powershell -ExecutionPolicy Bypass -File .\scripts\dev_down.ps1`
+
+Optional:
+- Clean reset:
+  `powershell -ExecutionPolicy Bypass -File .\scripts\dev_up.ps1 -Reset`
+
+Notes:
+- Run Alembic and pytest inside the `api` container, not from the Windows host.
+- The scripts already do this for you with `docker compose exec api ...`.
+- `dev_up.ps1` starts Docker services, waits for readiness, and runs `alembic upgrade head` inside the container.
+- `test_stage1_stage2.ps1` runs the Stage 1 and Stage 2 pytest suites inside the container with `PYTHONPATH=/app`.
+- `smoke_import_and_rebuild.ps1` performs a deterministic smoke import and lifecycle rebuild flow against the running local API.
+- `dev_down.ps1` stops the stack and supports `-Reset` to remove Docker volumes.

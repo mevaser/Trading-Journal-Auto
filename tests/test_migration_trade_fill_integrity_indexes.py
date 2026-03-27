@@ -8,8 +8,7 @@ from pathlib import Path
 
 import pytest
 
-
-HEAD_REVISION = "d3c1a9f4e6b2"
+from tests.utils.alembic_helpers import get_head_revision
 
 
 def _run_alembic(repo_root: Path, env: dict[str, str], *args: str) -> None:
@@ -57,7 +56,7 @@ def test_trade_fill_integrity_indexes_and_checks_exist(tmp_path: Path, monkeypat
     assert "ck_trade_fills_side_valid" in fills_table_sql
     assert "ck_trade_fills_quantity_positive" in fills_table_sql
     assert "ck_trade_fills_price_positive" in fills_table_sql
-    assert revision == HEAD_REVISION
+    assert revision == get_head_revision()
 
 
 def test_trade_fill_constraints_enforce_integrity(tmp_path: Path, monkeypatch) -> None:

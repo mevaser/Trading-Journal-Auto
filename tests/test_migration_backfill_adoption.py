@@ -6,8 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tests.utils.alembic_helpers import get_head_revision
 
-HEAD_REVISION = "d3c1a9f4e6b2"
 TENANT_FOUNDATION_REVISION = "8b7c6d5e4f31"
 PRE_TENANT_REVISION = "f2a6c4b9e1d7"
 
@@ -72,7 +72,7 @@ def test_backfill_adopts_legacy_rows_to_default_tenant(tmp_path: Path, monkeypat
     assert trade_tenant == 1
     assert fill_tenant == 1
     assert membership == (1, user_id, "owner")
-    assert revision == HEAD_REVISION
+    assert revision == get_head_revision()
 
 
 def test_backfill_bootstraps_default_admin_when_users_empty(tmp_path: Path, monkeypatch) -> None:

@@ -37,6 +37,10 @@ class AppSettings:
     app_debug: bool
     app_secret_key: str
     access_token_expire_minutes: int
+    ibkr_host: str
+    ibkr_port: int
+    ibkr_client_id: int
+    ibkr_timeout_seconds: int
 
 
 @lru_cache(maxsize=1)
@@ -51,12 +55,32 @@ def get_settings() -> AppSettings:
         default=15,
         key_name="ACCESS_TOKEN_EXPIRE_MINUTES",
     )
+    ibkr_host = merged.get("IBKR_HOST", "host.docker.internal").strip()
+    ibkr_port = _parse_positive_int(
+        merged.get("IBKR_PORT"),
+        default=4001,
+        key_name="IBKR_PORT",
+    )
+    ibkr_client_id = _parse_positive_int(
+        merged.get("IBKR_CLIENT_ID"),
+        default=1,
+        key_name="IBKR_CLIENT_ID",
+    )
+    ibkr_timeout_seconds = _parse_positive_int(
+        merged.get("IBKR_TIMEOUT_SECONDS"),
+        default=10,
+        key_name="IBKR_TIMEOUT_SECONDS",
+    )
     return AppSettings(
         profile=profile,
         database_url=database_url,
         app_debug=app_debug,
         app_secret_key=app_secret_key,
         access_token_expire_minutes=access_token_expire_minutes,
+        ibkr_host=ibkr_host,
+        ibkr_port=ibkr_port,
+        ibkr_client_id=ibkr_client_id,
+        ibkr_timeout_seconds=ibkr_timeout_seconds,
     )
 
 

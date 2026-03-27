@@ -11,7 +11,7 @@ class IBKRAdapter(ABC):
 
     @abstractmethod
     async def fetch_executions(
-        self, start_time: datetime, end_time: datetime
+        self, start_time: datetime, end_time: datetime, account_ref: str | None = None
     ) -> list[ExecutionDTO]:
         """Return normalized executions for the requested time window."""
         raise NotImplementedError

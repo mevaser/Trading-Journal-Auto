@@ -32,11 +32,14 @@ def map_fill_integrity_error(exc: IntegrityError, *, trade_id: int | None = None
     if _matches_any(
         normalized,
         (
-            "uq_trade_fills_tenant_external_fill_id",
-            "unique constraint failed: trade_fills.tenant_id, trade_fills.external_fill_id",
+            "uq_trade_fills_tenant_source_external_fill_id",
+            "unique constraint failed: trade_fills.tenant_id, trade_fills.source, trade_fills.external_fill_id",
         ),
     ):
-        return DomainValidationError("external_fill_id already exists for this tenant", details=details or None)
+        return DomainValidationError(
+            "external_fill_id already exists for this tenant and source",
+            details=details or None,
+        )
 
     return DomainValidationError("fill violates database integrity constraints", details=details or None)
 

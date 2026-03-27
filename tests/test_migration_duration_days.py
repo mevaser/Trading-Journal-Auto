@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tests.utils.alembic_helpers import get_head_revision
+
 
 def _run_alembic(repo_root: Path, env: dict[str, str], *args: str) -> None:
     subprocess.run(
@@ -34,7 +36,7 @@ def test_migration_adds_duration_days_column(tmp_path: Path, monkeypatch) -> Non
         current_revision = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
 
     assert "duration_days" in columns
-    assert current_revision == "d3c1a9f4e6b2"
+    assert current_revision == get_head_revision()
 
 
 def test_migration_downgrade_handles_nullable_trade_fields(tmp_path: Path, monkeypatch) -> None:
